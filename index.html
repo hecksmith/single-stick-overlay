@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Right Stick</title>
+    <title>Single-Stick Overlay</title>
     <meta charset="UTF-8" />
     <style>
       * {
@@ -41,7 +41,7 @@
 
   <body>
     <div class="info">
-      <div id="heading"></div>
+      <div id="info"></div>
       <table>
         <tr>
           <td>x:</td>
@@ -59,59 +59,52 @@
     <script type="module">
       import "./node_modules/joypad.js/dist/joypad.min.js";
 
+      // Gamepad default config
+      const DEFAULT_STICK = "right";
+      const DEFAULT_DEADZONE = 0.09;
+
+      // Visual config
       const RADIUS = 100;
-      const DEADZONE = 0.09;
+
+      // ✨
+
+      // Set current stick and deadzone in the URL, e.g.
+      //
+      //   https://<the-url>?stick=left&deadzone=0.5
+      //
+      const params = new Proxy(new URLSearchParams(window.location.search), {
+        get: (searchParams, prop) => searchParams.get(prop),
+      });
+
+      const STICK = params.stick || DEFAULT_STICK;
+      const DEADZONE = params.deadzone ? Number(params.deadzone) : DEFAULT_DEADZONE;
 
       const xVal = document.getElementById("xVal");
       const yVal = document.getElementById("yVal");
-      const heading = document.getElementById("heading");
-
+      const info = document.getElementById("info");
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d");
 
       const drawThrottled = throttle(draw, 16); // 60fps
-      const updateStatsThrottled = throttle(updateStats, 80); // slower ... need to be able to read it!!
+      const drawStatsThrottled = throttle(drawStats, 80); // Slower - need to be able to read it!
 
       let axisValues = {
         x: 0,
         y: 0,
       };
 
-      function resetInfo() {
-        heading.innerText = "No controller!";
+      function handleDisconnect() {
+        info.innerText = "No controller!";
+        info.style.display = "block";
       }
 
-      function updateInfo() {
-        heading.style.display = "none";
+      function handleConnect() {
+        info.style.display = "none";
       }
 
-      function updateStats() {
+      function drawStats() {
         xVal.innerText = axisValues.x;
         yVal.innerText = axisValues.y;
-      }
-
-      function update(e) {
-        const { directionOfMovement, stickMoved, axisMovementValue } = e.detail;
-
-        if (stickMoved !== "right_stick") {
-          return;
-        }
-
-        switch (directionOfMovement) {
-          case "left":
-          case "right": {
-            axisValues.x = applyDeadZoneAndFormatValue(axisMovementValue);
-            break;
-          }
-          case "top":
-          case "bottom": {
-            axisValues.y = applyDeadZoneAndFormatValue(axisMovementValue);
-            break;
-          }
-        }
-
-        drawThrottled();
-        updateStatsThrottled();
       }
 
       function draw() {
@@ -135,16 +128,39 @@
         // Position
         ctx.beginPath();
         ctx.arc(x, y, RADIUS / 10, 0, 2 * Math.PI);
-        ctx.fillStyle = "red";
+        ctx.fillStyle = STICK === "right" ? "red" : "#55aaff";
         ctx.fill();
       }
 
-      resetInfo();
+      function update(e) {
+        const { directionOfMovement, stickMoved, axisMovementValue } = e.detail;
+
+        if (stickMoved !== `${STICK}_stick`) {
+          return;
+        }
+
+        switch (directionOfMovement) {
+          case "left":
+          case "right": {
+            axisValues.x = applyDeadZoneAndFormatValue(axisMovementValue);
+            break;
+          }
+          case "top":
+          case "bottom": {
+            axisValues.y = applyDeadZoneAndFormatValue(axisMovementValue);
+            break;
+          }
+        }
+
+        drawThrottled();
+        drawStatsThrottled();
+      }
+
+      handleDisconnect();
       joypad.set({ axisMovementThreshold: 0.01 });
 
-      joypad.on("connect", updateInfo);
-      joypad.on("disconnect", resetInfo);
-
+      joypad.on("connect", handleConnect);
+      joypad.on("disconnect", handleDisconnect);
       joypad.on("axis_move", update);
 
       // Helpers
