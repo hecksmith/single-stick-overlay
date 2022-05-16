@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "serve",
+    "predeploy": "cp ./node_modules/joypad.js/dist/joypad.min.js .",
+    "deploy": "gh-pages -d .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,5 +15,8 @@
   "dependencies": {
     "joypad.js": "^2.2.5",
     "serve": "^13.0.2"
+  },
+  "devDependencies": {
+    "gh-pages": "^4.0.0"
   }
 }
