@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Single-Stick Overlay</title>
+    <meta charset="UTF-8" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        position: relative;
+        background: transparent;
+      }
+
+      td {
+        vertical-align: middle;
+      }
+
+      .info {
+        position: absolute;
+        right: 0;
+        color: #fff;
+        background-color: #222;
+        padding: 6px 8px 8px;
+        z-index: 1;
+        font-weight: 400;
+        font-size: 1.5em;
+        margin: 0;
+        font-family: monospace;
+      }
+
+      .vals {
+        width: 5rem;
+        text-align: right;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="info">
+      <div id="info"></div>
+      <table>
+        <tr>
+          <td>x:</td>
+          <td class="vals" id="xVal"></td>
+        </tr>
+        <tr>
+          <td>y:</td>
+          <td class="vals" id="yVal"></td>
+        </tr>
+      </table>
+    </div>
+
+    <canvas id="canvas" width="500" height="500"></canvas>
+
+    <script type="module">
+      // NOTE: Set current stick and deadzone in the URL, e.g.
+      //   https://<the-url>?stick=left&deadzone=0.5
+
+      import "./node_modules/joypad.js/dist/joypad.min.js";
+
+      // Default gamepad config
+      const DEFAULT_STICK = "right";
+      const DEFAULT_DEADZONE = 0.09;
+
+      // Visual config
+      const RADIUS = 100;
+
+      // ✨
+      const PARAMS = new URLSearchParams(window.location.search);
+      const STICK = PARAMS.get("stick") || DEFAULT_STICK;
+      const DEADZONE = PARAMS.get("deadzone") ? Number(PARAMS.get("deadzone")) : DEFAULT_DEADZONE;
+
+      const DIR_TO_AXIS = { left: "x", right: "x", top: "y", bottom: "y" };
+
+      // Elements
+      const $id = document.getElementById.bind(document);
+      const xVal = $id("xVal");
+      const yVal = $id("yVal");
+      const info = $id("info");
+      const canvas = $id("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // Throttle draw functions appropriately
+      const drawThrottled = throttle(draw, 16); // 60fps
+      const drawStatsThrottled = throttle(drawStats, 80); // Slower - need to be able to read it!
+
+      // Main global state, shared by drawing functions
+      let axisValues = { x: 0, y: 0 };
+
+      joypad.set({ axisMovementThreshold: 0.01 });
+
+      joypad.on("axis_move", ({ detail }) => {
+        if (detail.stickMoved !== `${STICK}_stick`) return;
+
+        const axis = DIR_TO_AXIS[detail.directionOfMovement];
+
+        axisValues[axis] = applyDeadZoneAndFormatValue(detail.axisMovementValue);
+
+        drawThrottled();
+        drawStatsThrottled();
+      });
+
+      joypad.on("connect", handleConnect);
+      joypad.on("disconnect", handleDisconnect);
+
+      handleDisconnect();
+
+      // Meat
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Background
+        ctx.beginPath();
+        ctx.arc(RADIUS, RADIUS, RADIUS, 0, 2 * Math.PI);
+        ctx.fillStyle = "#222";
+        ctx.fill();
+
+        // Center point
+        ctx.beginPath();
+        ctx.arc(RADIUS, RADIUS, 1, 0, 2 * Math.PI);
+        ctx.strokeStyle = "white";
+        ctx.stroke();
+
+        // Position
+        const x = Number(axisValues.x) * RADIUS + RADIUS;
+        const y = Number(axisValues.y) * RADIUS + RADIUS;
+
+        ctx.beginPath();
+        ctx.arc(x, y, RADIUS / 10, 0, 2 * Math.PI);
+        ctx.fillStyle = STICK === "right" ? "red" : "#55aaff";
+        ctx.fill();
+      }
+
+      function drawStats() {
+        xVal.innerText = axisValues.x;
+        yVal.innerText = axisValues.y;
+      }
+
+      function handleDisconnect() {
+        info.innerText = "No controller!";
+        info.style.display = "block";
+      }
+
+      function handleConnect() {
+        info.style.display = "none";
+      }
+
+      // Helpers
+
+      // prettier-ignore
+      function applyDeadZoneAndFormatValue(value) {
+        return ((value > 0 && value > DEADZONE) || (value < 0 && value < (DEADZONE *-1)))
+          ? value.toFixed(2)
+          : 0;
+      }
+
+      function throttle(callback, limit) {
+        let waiting = false;
+
+        return function () {
+          if (waiting) return;
+
+          callback.apply(this, arguments);
+          waiting = true;
+
+          setTimeout(() => {
+            waiting = false;
+          }, limit);
+        };
+      }
+    </script>
+  </body>
+</html>
