@@ -85,11 +85,12 @@
       const ctx = canvas.getContext("2d");
 
       // Throttle draw functions appropriately
-      const drawThrottled = throttle(draw, 16); // 60fps
+      const drawStickThrottled = throttle(drawStick, 16); // 60fps
       const drawStatsThrottled = throttle(drawStats, 80); // Slower - need to be able to read it!
 
-      // Main global state, shared by drawing functions
+      // Global state, shared by drawing functions
       let axisValues = { x: 0, y: 0 };
+      let isConnected = false;
 
       joypad.set({ axisMovementThreshold: 0.01 });
 
@@ -100,7 +101,7 @@
 
         axisValues[axis] = applyDeadZoneAndFormatValue(detail.axisMovementValue);
 
-        drawThrottled();
+        drawStickThrottled();
         drawStatsThrottled();
       });
 
@@ -109,9 +110,9 @@
 
       handleDisconnect();
 
-      // Meat
+      // Rendering
 
-      function draw() {
+      function drawStick() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Background
@@ -137,16 +138,24 @@
       }
 
       function drawStats() {
+        // Disconnect events may be missed -- ensure the disconnected message is cleared on any stats update
+        if (!isConnected) {
+          handleConnect();
+          isConnected = true;
+        }
+
         xVal.innerText = axisValues.x;
         yVal.innerText = axisValues.y;
       }
 
       function handleDisconnect() {
+        isConnected = false;
         info.innerText = "No controller!";
         info.style.display = "block";
       }
 
       function handleConnect() {
+        isConnected = true;
         info.style.display = "none";
       }
 
