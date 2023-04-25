@@ -60,6 +60,7 @@
       //   https://<the-url>?stick=left&deadzone=0.5
 
       import "./joypad.min.js";
+      import throttle from "./lodash.throttle@4.1.1.min.js";
 
       // Default gamepad config
       const DEFAULT_STICK = "right";
@@ -81,7 +82,7 @@
       const ctx = $id("canvas").getContext("2d");
 
       // Throttle draw function to 60fps
-      const drawThrottled = throttle(draw, 16);
+      const drawThrottled = throttle(draw, 16, { trailing: true });
 
       // Global state, shared by drawing functions
       let axisValues = { x: 0, y: 0 };
@@ -160,28 +161,11 @@
         info.style.display = "none";
       }
 
-      // Helpers
-
       // prettier-ignore
       function applyDeadZoneAndFormatValue(value) {
         return ((value > 0 && value > DEADZONE) || (value < 0 && value < (DEADZONE *-1)))
           ? value.toFixed(2)
           : 0;
-      }
-
-      function throttle(callback, limit) {
-        let waiting = false;
-
-        return function () {
-          if (waiting) return;
-
-          callback.apply(this, arguments);
-          waiting = true;
-
-          setTimeout(() => {
-            waiting = false;
-          }, limit);
-        };
       }
     </script>
   </body>
