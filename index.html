@@ -26,13 +26,21 @@
       .info {
         position: absolute;
         right: 0;
-        color: #fff;
-        background-color: #222;
-        padding: 6px 8px 8px;
         z-index: 1;
         font-weight: 400;
         font-size: 1.5em;
         font-family: monospace;
+      }
+
+      .status,
+      .stick {
+        padding: 6px 8px 8px;
+        color: #fff;
+        background-color: #222;
+      }
+
+      .stick + .stick {
+        margin-top: 10px;
       }
 
       .vals {
@@ -44,17 +52,8 @@
 
   <body>
     <div class="info">
-      <div id="info"></div>
-      <table>
-        <tr>
-          <td>x:</td>
-          <td class="vals" id="xVal"></td>
-        </tr>
-        <tr>
-          <td>y:</td>
-          <td class="vals" id="yVal"></td>
-        </tr>
-      </table>
+      <div id="status" class="status"></div>
+      <div id="stats"></div>
     </div>
 
     <canvas id="canvas" width="500" height="500"></canvas>
@@ -69,6 +68,7 @@
 
       // Visual config
       const RADIUS = 100;
+      const MARGIN = 10; // margin between two sticks
 
       // Get any custom configuration from URL query params
       const PARAMS = new URLSearchParams(window.location.search);
@@ -82,10 +82,9 @@
 
       // Elements
       const $id = document.getElementById.bind(document);
-      const xVal = $id("xVal");
-      const yVal = $id("yVal");
-      const info = $id("info");
       const ctx = $id("canvas").getContext("2d");
+      const $stats = $id("stats");
+      const $status = $id("status");
 
       // Throttle draw function to 60fps
       const drawThrottled = throttle(draw, 16, { trailing: true });
@@ -104,6 +103,7 @@
       joypad.set({ axisMovementThreshold: 0.01 });
 
       joypad.on("axis_move", ({ detail }) => {
+        // NOTE: `detail.stickMoved` is either `left_stick` or `right_stick`
         const whichMoved = detail.stickMoved.split("_")[0];
 
         if (sticksToDisplay.includes(whichMoved)) {
@@ -124,18 +124,14 @@
       function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        sticksToDisplay.forEach((s) => {
-          drawStick(s);
-          drawStats(s);
-        });
-
-        console.log(STATE, sticksToDisplay);
+        sticksToDisplay.forEach((s) => drawStick(s));
+        drawStats();
       }
 
       function drawStick(stick) {
         // prettier-ignore
         const offset = sticksToDisplay.length > 1 && stick === "right"
-          ? RADIUS * 2 + 20
+          ? RADIUS * 2 + MARGIN
           : 0;
 
         // Background
@@ -170,26 +166,41 @@
         ctx.stroke();
       }
 
-      function drawStats(stick) {
+      function drawStats() {
         // Ensure the disconnected message is cleared on any stats update
         if (!isConnected) {
           handleConnect();
           isConnected = true;
         }
 
-        xVal.innerText = STATE[stick].x;
-        yVal.innerText = STATE[stick].y;
+        // prettier-ignore
+        const html = sticksToDisplay.map((stick) => `
+          <div class="stick">
+            <table>
+              <tr>
+                <td>x:</td>
+                <td class="vals">${STATE[stick].x}</td>
+              </tr>
+              <tr>
+                <td>y:</td>
+                <td class="vals">${STATE[stick].y}</td>
+              </tr>
+            </table>
+          </div>
+        `).join("");
+
+        $stats.innerHTML = html;
       }
 
       function handleDisconnect() {
         isConnected = false;
-        info.innerText = "No controller!";
-        info.style.display = "block";
+        $status.innerText = "No controller!";
+        $status.style.display = "block";
       }
 
       function handleConnect() {
         isConnected = true;
-        info.style.display = "none";
+        $status.style.display = "none";
       }
 
       // Helpers
