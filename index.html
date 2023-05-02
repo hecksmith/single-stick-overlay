@@ -3,6 +3,10 @@
   <head>
     <title>Single-Stick Overlay</title>
     <meta charset="UTF-8" />
+    <!--
+      NOTE: Set current stick and deadzone in the URL, e.g.
+      https://<the-url>?stick=left&deadzone=0.5
+    -->
     <style>
       * {
         margin: 0;
@@ -56,9 +60,6 @@
     <canvas id="canvas" width="500" height="500"></canvas>
 
     <script type="module">
-      // NOTE: Set current stick and deadzone in the URL, e.g.
-      //   https://<the-url>?stick=left&deadzone=0.5
-
       import "./joypad.min.js";
       import throttle from "./lodash.throttle@4.1.1.min.js";
 
@@ -73,6 +74,7 @@
       const PARAMS = new URLSearchParams(window.location.search);
       const STICK = PARAMS.get("stick") || DEFAULT_STICK;
       const DEADZONE = PARAMS.get("deadzone") ? Number(PARAMS.get("deadzone")) : DEFAULT_DEADZONE;
+      const DOT_COLOR = STICK === "right" ? "red" : "#55aaff";
 
       // Elements
       const $id = document.getElementById.bind(document);
@@ -118,29 +120,37 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Background
-        ctx.beginPath();
-        ctx.arc(RADIUS, RADIUS, RADIUS, 0, 2 * Math.PI);
-        ctx.fillStyle = "#222";
-        ctx.fill();
-
-        // Center point
-        ctx.beginPath();
-        ctx.arc(RADIUS, RADIUS, 1, 0, 2 * Math.PI);
-        ctx.strokeStyle = "white";
-        ctx.stroke();
+        circle(RADIUS, RADIUS, RADIUS, "#222");
 
         // Position
         const x = Number(axisValues.x) * RADIUS + RADIUS;
         const y = Number(axisValues.y) * RADIUS + RADIUS;
+        circle(x, y, RADIUS / 10, DOT_COLOR);
 
+        // Center point
+        circle(RADIUS, RADIUS, 1, "white");
+
+        // Lines
+        /*
+        const len = 3;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#eee";
+        line(RADIUS, 0, RADIUS, len);
+        line(RADIUS, RADIUS * 2, RADIUS, RADIUS * 2 - len);
+        line(0, RADIUS, len, RADIUS);
+        line(RADIUS * 2, RADIUS, RADIUS * 2 - len, RADIUS);
+        */
+      }
+
+      function line(fromX, fromY, toX, toY) {
         ctx.beginPath();
-        ctx.arc(x, y, RADIUS / 10, 0, 2 * Math.PI);
-        ctx.fillStyle = STICK === "right" ? "red" : "#55aaff";
-        ctx.fill();
+        ctx.moveTo(fromX, fromY);
+        ctx.lineTo(toX, toY);
+        ctx.stroke();
       }
 
       function drawStats() {
-        // Disconnect events may be missed -- ensure the disconnected message is cleared on any stats update
+        // Ensure the disconnected message is cleared on any stats update
         if (!isConnected) {
           handleConnect();
           isConnected = true;
@@ -159,6 +169,15 @@
       function handleConnect() {
         isConnected = true;
         info.style.display = "none";
+      }
+
+      // Helpers
+
+      function circle(x, y, radius, fillStyle) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
       }
 
       // prettier-ignore
