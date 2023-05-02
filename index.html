@@ -74,7 +74,11 @@
       const PARAMS = new URLSearchParams(window.location.search);
       const STICK = PARAMS.get("stick") || DEFAULT_STICK;
       const DEADZONE = PARAMS.get("deadzone") ? Number(PARAMS.get("deadzone")) : DEFAULT_DEADZONE;
-      const DOT_COLOR = STICK === "right" ? "red" : "#55aaff";
+
+      // prettier-ignore
+      const sticksToDisplay = (STICK === "left" || STICK === "right")
+        ? [STICK]
+        : ["left", "right"];
 
       // Elements
       const $id = document.getElementById.bind(document);
@@ -87,21 +91,27 @@
       const drawThrottled = throttle(draw, 16, { trailing: true });
 
       // Global state, shared by drawing functions
-      let axisValues = { x: 0, y: 0 };
       let isConnected = false;
 
-      // Wire up!
-      joypad.set({ axisMovementThreshold: 0.01 });
+      const STATE = {
+        left: { x: 0, y: 0 },
+        right: { x: 0, y: 0 },
+      };
 
+      // Wire up!
       const DIR_TO_AXIS = { left: "x", right: "x", top: "y", bottom: "y" };
 
+      joypad.set({ axisMovementThreshold: 0.01 });
+
       joypad.on("axis_move", ({ detail }) => {
-        if (detail.stickMoved !== `${STICK}_stick`) return;
+        const whichMoved = detail.stickMoved.split("_")[0];
 
-        const axis = DIR_TO_AXIS[detail.directionOfMovement];
+        if (sticksToDisplay.includes(whichMoved)) {
+          const axis = DIR_TO_AXIS[detail.directionOfMovement];
 
-        axisValues[axis] = applyDeadZoneAndFormatValue(detail.axisMovementValue);
-        drawThrottled();
+          STATE[whichMoved][axis] = applyDeadZoneAndFormatValue(detail.axisMovementValue);
+          drawThrottled();
+        }
       });
 
       joypad.on("connect", handleConnect);
@@ -112,23 +122,34 @@
       // Rendering
 
       function draw() {
-        drawStick();
-        drawStats();
-      }
-
-      function drawStick() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        sticksToDisplay.forEach((s) => {
+          drawStick(s);
+          drawStats(s);
+        });
+
+        console.log(STATE, sticksToDisplay);
+      }
+
+      function drawStick(stick) {
+        // prettier-ignore
+        const offset = sticksToDisplay.length > 1 && stick === "right"
+          ? RADIUS * 2 + 20
+          : 0;
+
         // Background
-        circle(RADIUS, RADIUS, RADIUS, "#222");
+        circle(RADIUS + offset, RADIUS, RADIUS, "#222");
 
         // Position
-        const x = Number(axisValues.x) * RADIUS + RADIUS;
-        const y = Number(axisValues.y) * RADIUS + RADIUS;
-        circle(x, y, RADIUS / 10, DOT_COLOR);
+        const x = Number(STATE[stick].x) * RADIUS + RADIUS + offset;
+        const y = Number(STATE[stick].y) * RADIUS + RADIUS;
+
+        const dotColor = stick === "right" ? "red" : "#55aaff";
+        circle(x, y, RADIUS / 10, dotColor);
 
         // Center point
-        circle(RADIUS, RADIUS, 1, "white");
+        circle(RADIUS + offset, RADIUS, 1, "white");
 
         // Lines
         /*
@@ -149,15 +170,15 @@
         ctx.stroke();
       }
 
-      function drawStats() {
+      function drawStats(stick) {
         // Ensure the disconnected message is cleared on any stats update
         if (!isConnected) {
           handleConnect();
           isConnected = true;
         }
 
-        xVal.innerText = axisValues.x;
-        yVal.innerText = axisValues.y;
+        xVal.innerText = STATE[stick].x;
+        yVal.innerText = STATE[stick].y;
       }
 
       function handleDisconnect() {
