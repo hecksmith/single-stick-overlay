@@ -3,6 +3,10 @@
   <head>
     <title>Single-Stick Overlay</title>
     <meta charset="UTF-8" />
+    <!--
+      NOTE: Set current stick and deadzone in the URL, e.g.
+      https://<the-url>?stick=left&deadzone=0.5
+    -->
     <style>
       * {
         margin: 0;
@@ -22,43 +26,46 @@
       .info {
         position: absolute;
         right: 0;
-        color: #fff;
-        background-color: #222;
-        padding: 6px 8px 8px;
         z-index: 1;
         font-weight: 400;
         font-size: 1.5em;
         font-family: monospace;
       }
 
+      .status,
+      .stick {
+        padding: 6px 8px 8px;
+        color: #fff;
+        background-color: #222;
+      }
+
+      .stick + .stick {
+        margin-top: 10px;
+      }
+
       .vals {
         width: 5rem;
         text-align: right;
+      }
+
+      body.dual-sticks .stick.left {
+        border-left: 4px solid #55aaff;
+      }
+      body.dual-sticks .stick.right {
+        border-left: 4px solid red;
       }
     </style>
   </head>
 
   <body>
     <div class="info">
-      <div id="info"></div>
-      <table>
-        <tr>
-          <td>x:</td>
-          <td class="vals" id="xVal"></td>
-        </tr>
-        <tr>
-          <td>y:</td>
-          <td class="vals" id="yVal"></td>
-        </tr>
-      </table>
+      <div id="status" class="status"></div>
+      <div id="stats"></div>
     </div>
 
     <canvas id="canvas" width="500" height="500"></canvas>
 
     <script type="module">
-      // NOTE: Set current stick and deadzone in the URL, e.g.
-      //   https://<the-url>?stick=left&deadzone=0.5
-
       import "./joypad.min.js";
       import throttle from "./lodash.throttle@4.1.1.min.js";
 
@@ -68,38 +75,54 @@
 
       // Visual config
       const RADIUS = 100;
+      const MARGIN = 10; // margin between two sticks
 
       // Get any custom configuration from URL query params
       const PARAMS = new URLSearchParams(window.location.search);
       const STICK = PARAMS.get("stick") || DEFAULT_STICK;
       const DEADZONE = PARAMS.get("deadzone") ? Number(PARAMS.get("deadzone")) : DEFAULT_DEADZONE;
 
+      // prettier-ignore
+      const sticksToDisplay = (STICK === "left" || STICK === "right")
+        ? [STICK]
+        : ["left", "right"];
+
       // Elements
       const $id = document.getElementById.bind(document);
-      const xVal = $id("xVal");
-      const yVal = $id("yVal");
-      const info = $id("info");
       const ctx = $id("canvas").getContext("2d");
+      const $stats = $id("stats");
+      const $status = $id("status");
+
+      // Set a class on the `body` for styling
+      if (sticksToDisplay.length > 1) {
+        document.body.classList.add("dual-sticks");
+      }
 
       // Throttle draw function to 60fps
       const drawThrottled = throttle(draw, 16, { trailing: true });
 
       // Global state, shared by drawing functions
-      let axisValues = { x: 0, y: 0 };
       let isConnected = false;
 
-      // Wire up!
-      joypad.set({ axisMovementThreshold: 0.01 });
+      const STATE = {
+        left: { x: 0, y: 0 },
+        right: { x: 0, y: 0 },
+      };
 
+      // Wire up!
       const DIR_TO_AXIS = { left: "x", right: "x", top: "y", bottom: "y" };
 
+      joypad.set({ axisMovementThreshold: 0.01 });
+
       joypad.on("axis_move", ({ detail }) => {
-        if (detail.stickMoved !== `${STICK}_stick`) return;
+        const whichMoved = detail.stickMoved.split("_")[0]; // `stickMoved` is either `left_stick` or `right_stick`
 
-        const axis = DIR_TO_AXIS[detail.directionOfMovement];
+        if (sticksToDisplay.includes(whichMoved)) {
+          const axis = DIR_TO_AXIS[detail.directionOfMovement];
 
-        axisValues[axis] = applyDeadZoneAndFormatValue(detail.axisMovementValue);
-        drawThrottled();
+          STATE[whichMoved][axis] = applyDeadZoneAndFormatValue(detail.axisMovementValue);
+          drawThrottled();
+        }
       });
 
       joypad.on("connect", handleConnect);
@@ -110,55 +133,81 @@
       // Rendering
 
       function draw() {
-        drawStick();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        sticksToDisplay.forEach((s) => drawStick(s));
         drawStats();
       }
 
-      function drawStick() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      function drawStick(stick) {
+        // prettier-ignore
+        const offset = sticksToDisplay.length > 1 && stick === "right"
+          ? RADIUS + MARGIN
+          : 0;
+
+        // prettier-ignore
+        const radius = sticksToDisplay.length > 1 && stick === "left"
+          ? RADIUS / 2
+          : RADIUS;
 
         // Background
-        ctx.beginPath();
-        ctx.arc(RADIUS, RADIUS, RADIUS, 0, 2 * Math.PI);
-        ctx.fillStyle = "#222";
-        ctx.fill();
-
-        // Center point
-        ctx.beginPath();
-        ctx.arc(RADIUS, RADIUS, 1, 0, 2 * Math.PI);
-        ctx.strokeStyle = "white";
-        ctx.stroke();
+        circle(radius + offset, radius, radius, "#222");
 
         // Position
-        const x = Number(axisValues.x) * RADIUS + RADIUS;
-        const y = Number(axisValues.y) * RADIUS + RADIUS;
+        const x = Number(STATE[stick].x) * radius + radius + offset;
+        const y = Number(STATE[stick].y) * radius + radius;
 
-        ctx.beginPath();
-        ctx.arc(x, y, RADIUS / 10, 0, 2 * Math.PI);
-        ctx.fillStyle = STICK === "right" ? "red" : "#55aaff";
-        ctx.fill();
+        const dotColor = stick === "right" ? "red" : "#55aaff";
+        circle(x, y, RADIUS / 10, dotColor);
+
+        // Center point
+        circle(radius + offset, radius, 1, "white");
       }
 
       function drawStats() {
-        // Disconnect events may be missed -- ensure the disconnected message is cleared on any stats update
+        // Ensure the disconnected message is cleared on any stats update
         if (!isConnected) {
           handleConnect();
           isConnected = true;
         }
 
-        xVal.innerText = axisValues.x;
-        yVal.innerText = axisValues.y;
+        // prettier-ignore
+        const html = sticksToDisplay.map((stick) => `
+          <div class="stick ${stick}">
+            <table>
+              <tr>
+                <td>x:</td>
+                <td class="vals">${STATE[stick].x}</td>
+              </tr>
+              <tr>
+                <td>y:</td>
+                <td class="vals">${STATE[stick].y}</td>
+              </tr>
+            </table>
+          </div>
+        `).join("");
+
+        $stats.innerHTML = html;
       }
 
       function handleDisconnect() {
         isConnected = false;
-        info.innerText = "No controller!";
-        info.style.display = "block";
+        $status.innerText = "No controller!";
+        $status.style.display = "block";
       }
 
       function handleConnect() {
         isConnected = true;
-        info.style.display = "none";
+        $status.style.display = "none";
+      }
+
+      // Helpers
+
+      function circle(x, y, radius, fillStyle) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
       }
 
       // prettier-ignore
