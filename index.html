@@ -47,6 +47,13 @@
         width: 5rem;
         text-align: right;
       }
+
+      body.dual-sticks .stick.left {
+        border-left: 4px solid #55aaff;
+      }
+      body.dual-sticks .stick.right {
+        border-left: 4px solid red;
+      }
     </style>
   </head>
 
@@ -86,6 +93,11 @@
       const $stats = $id("stats");
       const $status = $id("status");
 
+      // Set a class on the `body` for styling
+      if (sticksToDisplay.length > 1) {
+        document.body.classList.add("dual-sticks");
+      }
+
       // Throttle draw function to 60fps
       const drawThrottled = throttle(draw, 16, { trailing: true });
 
@@ -103,8 +115,7 @@
       joypad.set({ axisMovementThreshold: 0.01 });
 
       joypad.on("axis_move", ({ detail }) => {
-        // NOTE: `detail.stickMoved` is either `left_stick` or `right_stick`
-        const whichMoved = detail.stickMoved.split("_")[0];
+        const whichMoved = detail.stickMoved.split("_")[0]; // `stickMoved` is either `left_stick` or `right_stick`
 
         if (sticksToDisplay.includes(whichMoved)) {
           const axis = DIR_TO_AXIS[detail.directionOfMovement];
@@ -131,39 +142,26 @@
       function drawStick(stick) {
         // prettier-ignore
         const offset = sticksToDisplay.length > 1 && stick === "right"
-          ? RADIUS * 2 + MARGIN
+          ? RADIUS + MARGIN
           : 0;
 
+        // prettier-ignore
+        const radius = sticksToDisplay.length > 1 && stick === "left"
+          ? RADIUS / 2
+          : RADIUS;
+
         // Background
-        circle(RADIUS + offset, RADIUS, RADIUS, "#222");
+        circle(radius + offset, radius, radius, "#222");
 
         // Position
-        const x = Number(STATE[stick].x) * RADIUS + RADIUS + offset;
-        const y = Number(STATE[stick].y) * RADIUS + RADIUS;
+        const x = Number(STATE[stick].x) * radius + radius + offset;
+        const y = Number(STATE[stick].y) * radius + radius;
 
         const dotColor = stick === "right" ? "red" : "#55aaff";
         circle(x, y, RADIUS / 10, dotColor);
 
         // Center point
-        circle(RADIUS + offset, RADIUS, 1, "white");
-
-        // Lines
-        /*
-        const len = 3;
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "#eee";
-        line(RADIUS, 0, RADIUS, len);
-        line(RADIUS, RADIUS * 2, RADIUS, RADIUS * 2 - len);
-        line(0, RADIUS, len, RADIUS);
-        line(RADIUS * 2, RADIUS, RADIUS * 2 - len, RADIUS);
-        */
-      }
-
-      function line(fromX, fromY, toX, toY) {
-        ctx.beginPath();
-        ctx.moveTo(fromX, fromY);
-        ctx.lineTo(toX, toY);
-        ctx.stroke();
+        circle(radius + offset, radius, 1, "white");
       }
 
       function drawStats() {
@@ -175,7 +173,7 @@
 
         // prettier-ignore
         const html = sticksToDisplay.map((stick) => `
-          <div class="stick">
+          <div class="stick ${stick}">
             <table>
               <tr>
                 <td>x:</td>
