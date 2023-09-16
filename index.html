@@ -69,6 +69,8 @@
       import "./joypad.min.js";
       import throttle from "./lodash.throttle@4.1.1.min.js";
 
+      const DEBUG = localStorage.debug && localStorage.debug.includes("*");
+
       // Default gamepad config
       const DEFAULT_STICK = "right";
       const DEFAULT_DEADZONE = 0.01;
@@ -109,16 +111,24 @@
         right: { x: 0, y: 0 },
       };
 
-      // Wire up!
+      // Wire up ✨
       const DIR_TO_AXIS = { left: "x", right: "x", top: "y", bottom: "y" };
 
-      joypad.set({ axisMovementThreshold: 0.01 });
+      // NOTE: Setting this higher, like 0.01 (which seems more appropriate) causes missed
+      //       events & values not returning to 0, when the stick is returned to center.
+      joypad.set({ axisMovementThreshold: 0.0001 });
 
       joypad.on("axis_move", ({ detail }) => {
-        const whichMoved = detail.stickMoved.split("_")[0]; // `stickMoved` is either `left_stick` or `right_stick`
+        const whichMoved = detail.stickMoved.split("_")[0]; // `stickMoved` is either left_stick or right_stick
+        const axis = DIR_TO_AXIS[detail.directionOfMovement];
 
         if (sticksToDisplay.includes(whichMoved)) {
-          const axis = DIR_TO_AXIS[detail.directionOfMovement];
+          if (DEBUG) {
+            const newValue = applyDeadZoneAndFormatValue(detail.axisMovementValue);
+            const isNew = STATE[whichMoved][axis] !== newValue;
+
+            console.log(axis, isNew ? "Y" : "N", newValue, detail);
+          }
 
           STATE[whichMoved][axis] = applyDeadZoneAndFormatValue(detail.axisMovementValue);
           drawThrottled();
