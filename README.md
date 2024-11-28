@@ -16,14 +16,18 @@ To display the left stick, instead of the default of right, set `stick=left` as 
 
 > https://hecksmith.github.io/single-stick-overlay/?stick=left
 
+To show both sticks at once, set `stick=both`, e.g.
+
+> https://hecksmith.github.io/single-stick-overlay/?stick=both
+
 To set your deadzone (so that values below your deadzone are not displayed), set `deadzone` in the URL:
 
-> Set a 20% deadzone:  
-> https://hecksmith.github.io/single-stick-overlay/?deadzone=0.20
+> Set a 5% deadzone:  
+> https://hecksmith.github.io/single-stick-overlay/?deadzone=0.05
 
-To combine parameters, separate them with `&`. For example, to set stick to **left** and deadzone to **20%**:
+To combine parameters, separate them with `&`. For example, to set stick to **left** and deadzone to **5%**:
 
-> https://hecksmith.github.io/single-stick-overlay/?stick=left&deadzone=0.20
+> https://hecksmith.github.io/single-stick-overlay/?stick=left&deadzone=0.05
 
 ## Contributing
 
