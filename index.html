@@ -114,23 +114,25 @@
       // Wire up ✨
       const DIR_TO_AXIS = { left: "x", right: "x", top: "y", bottom: "y" };
 
-      // NOTE: Setting this higher, like 0.01 (which seems more appropriate) causes missed
-      //       events & values not returning to 0, when the stick is returned to center.
-      joypad.set({ axisMovementThreshold: 0.0001 });
+      // IMPORTANT: Must be set to 0, else no "axis_move" events are
+      //            sent when the stick is reset to center (0 value).
+      joypad.set({ axisMovementThreshold: 0 });
 
       joypad.on("axis_move", ({ detail }) => {
         const whichMoved = detail.stickMoved.split("_")[0]; // `stickMoved` is either left_stick or right_stick
         const axis = DIR_TO_AXIS[detail.directionOfMovement];
 
         if (sticksToDisplay.includes(whichMoved)) {
-          if (DEBUG) {
-            const newValue = applyDeadZoneAndFormatValue(detail.axisMovementValue);
-            const isNew = STATE[whichMoved][axis] !== newValue;
+          const valueWithDeadzone = applyDeadZoneAndFormatValue(detail.axisMovementValue);
 
-            console.log(axis, isNew ? "Y" : "N", newValue, detail);
+          if (DEBUG) {
+            const isNew = STATE[whichMoved][axis] !== valueWithDeadzone;
+            const value2dp = parseFloat(detail.axisMovementValue.toFixed(2));
+
+            console.log(axis, `New? [${isNew}]`, value2dp, "with DZ:", valueWithDeadzone, "raw:", detail.axisMovementValue); // prettier-ignore
           }
 
-          STATE[whichMoved][axis] = applyDeadZoneAndFormatValue(detail.axisMovementValue);
+          STATE[whichMoved][axis] = valueWithDeadzone;
           drawThrottled();
         }
       });
@@ -182,20 +184,25 @@
         }
 
         // prettier-ignore
-        const html = sticksToDisplay.map((stick) => `
-          <div class="stick ${stick}">
-            <table>
-              <tr>
-                <td>x:</td>
-                <td class="vals">${STATE[stick].x}</td>
-              </tr>
-              <tr>
-                <td>y:</td>
-                <td class="vals">${STATE[stick].y}</td>
-              </tr>
-            </table>
-          </div>
-        `).join("");
+        const html = sticksToDisplay.map((stick) => {
+          const { x, y } = STATE[stick];
+
+          // NOTE: toFixed(2) is used again to handle `0` -> `0.00`
+          return `
+            <div class="stick ${stick}">
+              <table>
+                <tr>
+                  <td>x:</td>
+                  <td class="vals">${x.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td>y:</td>
+                  <td class="vals">${y.toFixed(2)}</td>
+                </tr>
+              </table>
+            </div>
+          `;
+        }).join("");
 
         $stats.innerHTML = html;
       }
@@ -220,11 +227,13 @@
         ctx.fill();
       }
 
+      function isOutsideDeadzone(value) {
+        return (value > 0 && value > DEADZONE) || (value < 0 && value < DEADZONE * -1);
+      }
+
       // prettier-ignore
       function applyDeadZoneAndFormatValue(value) {
-        return ((value > 0 && value > DEADZONE) || (value < 0 && value < (DEADZONE *-1)))
-          ? value.toFixed(2)
-          : 0;
+        return isOutsideDeadzone(value) ? parseFloat(value.toFixed(2)) : 0;
       }
     </script>
   </body>
