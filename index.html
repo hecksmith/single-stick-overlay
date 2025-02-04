@@ -5,7 +5,10 @@
     <meta charset="UTF-8" />
     <!--
       NOTE: Set current stick and deadzone in the URL, e.g.
-      https://<the-url>?stick=left&deadzone=0.5
+      https://<the-url>?stick=left&deadzone=0.05
+
+      (For both sticks, set `stick=both`)
+      https://<the-url>?stick=both...
     -->
     <style>
       * {
@@ -73,17 +76,40 @@
 
       // Default gamepad config
       const DEFAULT_STICK = "right";
-      const DEFAULT_DEADZONE = 0.01;
+      const DEFAULT_DEADZONE = "0.01";
+      const DEFAULT_DEADZONES = "0.01,0.01";
 
       // Visual config
-      const DECIMAL_PLACES = 3;
+      const DECIMAL_PLACES = 2;
       const RADIUS = 100;
       const MARGIN = 10; // margin between two sticks
 
       // Get any custom configuration from URL query params
       const PARAMS = new URLSearchParams(window.location.search);
       const STICK = PARAMS.get("stick") || DEFAULT_STICK;
-      const DEADZONE = PARAMS.get("deadzone") ? Number(PARAMS.get("deadzone")) : DEFAULT_DEADZONE;
+      const DEADZONES = getDeadzoneParam();
+
+      function getDeadzoneParam() {
+        // Legacy param - single "deadzone" value applied to both sticks
+        if (PARAMS.get("deadzone")) {
+          const value = Number(PARAMS.get("deadzone"));
+          return [value, value];
+        }
+
+        // Default param style (comma-separated) e.g. deadzones=0.01,0.05
+        let deadzonesStr;
+
+        if (PARAMS.get("deadzones") && PARAMS.get("deadzones").split(",").length !== 2) {
+          console.error(
+            "Incorrect formatting for 'deadzones' URL parameter. Should be `<left>,<right>` e.g. `deadzones=0.01,0.05`"
+          );
+          deadzonesStr = DEFAULT_DEADZONES;
+        } else {
+          deadzonesStr = PARAMS.get("deadzones") || DEFAULT_DEADZONES;
+        }
+
+        return deadzonesStr.split(",").map(Number);
+      }
 
       // prettier-ignore
       const sticksToDisplay = (STICK === "left" || STICK === "right")
@@ -124,7 +150,7 @@
         const axis = DIR_TO_AXIS[detail.directionOfMovement];
 
         if (sticksToDisplay.includes(whichMoved)) {
-          const valueWithDeadzone = applyDeadZoneAndFormatValue(detail.axisMovementValue);
+          const valueWithDeadzone = applyDeadZoneAndFormatValue(detail.axisMovementValue, whichMoved);
 
           if (DEBUG) {
             const isNew = STATE[whichMoved][axis] !== valueWithDeadzone;
@@ -228,13 +254,15 @@
         ctx.fill();
       }
 
-      function isOutsideDeadzone(value) {
-        return (value > 0 && value > DEADZONE) || (value < 0 && value < DEADZONE * -1);
+      function isOutsideDeadzone(value, stickName) {
+        const deadzone = stickName === "left" ? DEADZONES[0] : DEADZONES[1];
+
+        return (value > 0 && value > deadzone) || (value < 0 && value < deadzone * -1);
       }
 
       // prettier-ignore
-      function applyDeadZoneAndFormatValue(value) {
-        return isOutsideDeadzone(value) ? parseFloat(value.toFixed(DECIMAL_PLACES)) : 0;
+      function applyDeadZoneAndFormatValue(value, stickName) {
+        return isOutsideDeadzone(value, stickName) ? parseFloat(value.toFixed(DECIMAL_PLACES)) : 0;
       }
     </script>
   </body>
