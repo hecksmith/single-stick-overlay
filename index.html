@@ -31,24 +31,28 @@
         right: 0;
         z-index: 1;
         font-weight: 400;
-        font-size: 1.5em;
+        font-size: 18px; /* prev 1.5em (~20px) */
         font-family: monospace;
       }
 
       .status,
       .stick {
-        padding: 6px 8px 8px;
+        padding: 3px 6px 6px 8px; /* top has least space to balance the descender on y */
         color: #fff;
         background-color: #222;
       }
 
       .stick + .stick {
-        margin-top: 10px;
+        margin-top: 8px; /* prev 10px */
       }
 
       .vals {
-        width: 5rem;
+        width: 60px; /* prev 5rem */
         text-align: right;
+      }
+
+      .vals.zero {
+        color: #a5a5a5;
       }
 
       body.dual-sticks .stick.left {
@@ -83,6 +87,9 @@
       const DECIMAL_PLACES = 2;
       const RADIUS = 100;
       const MARGIN = 10; // margin between two sticks
+
+      // Options
+      const DEFLICKER = true;
 
       // Get any custom configuration from URL query params
       const PARAMS = new URLSearchParams(window.location.search);
@@ -141,6 +148,15 @@
       // Wire up ✨
       const DIR_TO_AXIS = { left: "x", right: "x", top: "y", bottom: "y" };
 
+      const shouldDrawNewValue = (newValue, oldValue) => {
+        if (DEFLICKER) {
+          const diff = parseFloat(Math.abs(newValue - oldValue).toFixed(2));
+          return diff > 0.01 || newValue === 0;
+        } else {
+          return newValue !== oldValue;
+        }
+      };
+
       // IMPORTANT: Must be set to 0, else no "axis_move" events are
       //            sent when the stick is reset to center (0 value).
       joypad.set({ axisMovementThreshold: 0 });
@@ -151,16 +167,17 @@
 
         if (sticksToDisplay.includes(whichMoved)) {
           const valueWithDeadzone = applyDeadZoneAndFormatValue(detail.axisMovementValue, whichMoved);
+          const shouldDraw = shouldDrawNewValue(STATE[whichMoved][axis], valueWithDeadzone);
 
           if (DEBUG) {
-            const isNew = STATE[whichMoved][axis] !== valueWithDeadzone;
             const valueWithDP = parseFloat(detail.axisMovementValue.toFixed(DECIMAL_PLACES));
-
-            console.log(axis, `New? [${isNew}]`, valueWithDP, "with DZ:", valueWithDeadzone, "raw:", detail.axisMovementValue); // prettier-ignore
+            console.log(axis, `New? [${shouldDraw}]`, valueWithDP, "with DZ:", valueWithDeadzone, "raw:", detail.axisMovementValue); // prettier-ignore
           }
 
-          STATE[whichMoved][axis] = valueWithDeadzone;
-          drawThrottled();
+          if (shouldDraw) {
+            STATE[whichMoved][axis] = valueWithDeadzone;
+            drawThrottled();
+          }
         }
       });
 
@@ -212,19 +229,22 @@
 
         // prettier-ignore
         const html = sticksToDisplay.map((stick) => {
-          const { x, y } = STATE[stick];
+          const { x: xVal, y: yVal } = STATE[stick];
 
           // NOTE: toFixed() is used again to handle `0` -> `0.00`
+          const x = xVal.toFixed(DECIMAL_PLACES);
+          const y = yVal.toFixed(DECIMAL_PLACES);
+
           return `
             <div class="stick ${stick}">
               <table>
                 <tr>
                   <td>x:</td>
-                  <td class="vals">${x.toFixed(DECIMAL_PLACES)}</td>
+                  <td class="vals ${x === "0.00" ? "zero" : ""}">${x}</td>
                 </tr>
                 <tr>
                   <td>y:</td>
-                  <td class="vals">${y.toFixed(DECIMAL_PLACES)}</td>
+                  <td class="vals ${y === "0.00" ? "zero" : ""}">${y}</td>
                 </tr>
               </table>
             </div>
