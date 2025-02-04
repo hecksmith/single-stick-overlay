@@ -76,6 +76,7 @@
       const DEFAULT_DEADZONE = 0.01;
 
       // Visual config
+      const DECIMAL_PLACES = 3;
       const RADIUS = 100;
       const MARGIN = 10; // margin between two sticks
 
@@ -127,9 +128,9 @@
 
           if (DEBUG) {
             const isNew = STATE[whichMoved][axis] !== valueWithDeadzone;
-            const value2dp = parseFloat(detail.axisMovementValue.toFixed(2));
+            const valueWithDP = parseFloat(detail.axisMovementValue.toFixed(DECIMAL_PLACES));
 
-            console.log(axis, `New? [${isNew}]`, value2dp, "with DZ:", valueWithDeadzone, "raw:", detail.axisMovementValue); // prettier-ignore
+            console.log(axis, `New? [${isNew}]`, valueWithDP, "with DZ:", valueWithDeadzone, "raw:", detail.axisMovementValue); // prettier-ignore
           }
 
           STATE[whichMoved][axis] = valueWithDeadzone;
@@ -187,17 +188,17 @@
         const html = sticksToDisplay.map((stick) => {
           const { x, y } = STATE[stick];
 
-          // NOTE: toFixed(2) is used again to handle `0` -> `0.00`
+          // NOTE: toFixed() is used again to handle `0` -> `0.00`
           return `
             <div class="stick ${stick}">
               <table>
                 <tr>
                   <td>x:</td>
-                  <td class="vals">${x.toFixed(2)}</td>
+                  <td class="vals">${x.toFixed(DECIMAL_PLACES)}</td>
                 </tr>
                 <tr>
                   <td>y:</td>
-                  <td class="vals">${y.toFixed(2)}</td>
+                  <td class="vals">${y.toFixed(DECIMAL_PLACES)}</td>
                 </tr>
               </table>
             </div>
@@ -233,7 +234,7 @@
 
       // prettier-ignore
       function applyDeadZoneAndFormatValue(value) {
-        return isOutsideDeadzone(value) ? parseFloat(value.toFixed(2)) : 0;
+        return isOutsideDeadzone(value) ? parseFloat(value.toFixed(DECIMAL_PLACES)) : 0;
       }
     </script>
   </body>
