@@ -22,28 +22,41 @@
         background: transparent;
       }
 
+      body {
+        padding: 15px;
+      }
+
       td {
         vertical-align: middle;
       }
 
       .info {
         position: absolute;
-        right: 0;
         z-index: 1;
-        font-weight: 400;
+        left: 350px; /* TODO: Sync with stick size and number of sticks */
+        bottom: 35px; /* TODO: Sync with bottom margin of sticks/bottom-padding of body */
+        font-weight: 500;
         font-size: 18px; /* prev 1.5em (~20px) */
         font-family: monospace;
       }
 
       .status,
       .stick {
-        padding: 3px 6px 6px 8px; /* top has least space to balance the descender on y */
+        padding: 4px 6px 6px 8px; /* top has least space to balance the descender on y */
         color: #fff;
-        background-color: #222;
+        background-color: #111;
       }
 
       .stick + .stick {
-        margin-top: 8px; /* prev 10px */
+        margin-top: 4px; /* prev 10px */
+      }
+
+      .vals-label {
+        font-size: 16px;
+      }
+      .vals-label:after {
+        content: ":";
+        font-size: 20px;
       }
 
       .vals {
@@ -70,7 +83,8 @@
       <div id="stats"></div>
     </div>
 
-    <canvas id="canvas" width="500" height="500"></canvas>
+    <!-- TODO: Sync with margin for info etc -->
+    <canvas id="canvas" width="350" height="225"></canvas>
 
     <script type="module">
       import "./joypad.min.js";
@@ -86,7 +100,7 @@
       // Visual config
       const DECIMAL_PLACES = 2;
       const RADIUS = 100;
-      const MARGIN = 10; // margin between two sticks
+      const MARGIN = 10; // margin between two sticks & above sticks
 
       // Options
       const DEFLICKER = true;
@@ -95,28 +109,6 @@
       const PARAMS = new URLSearchParams(window.location.search);
       const STICK = PARAMS.get("stick") || DEFAULT_STICK;
       const DEADZONES = getDeadzoneParam();
-
-      function getDeadzoneParam() {
-        // Legacy param - single "deadzone" value applied to both sticks
-        if (PARAMS.get("deadzone")) {
-          const value = Number(PARAMS.get("deadzone"));
-          return [value, value];
-        }
-
-        // Default param style (comma-separated) e.g. deadzones=0.01,0.05
-        let deadzonesStr;
-
-        if (PARAMS.get("deadzones") && PARAMS.get("deadzones").split(",").length !== 2) {
-          console.error(
-            "Incorrect formatting for 'deadzones' URL parameter. Should be `<left>,<right>` e.g. `deadzones=0.01,0.05`"
-          );
-          deadzonesStr = DEFAULT_DEADZONES;
-        } else {
-          deadzonesStr = PARAMS.get("deadzones") || DEFAULT_DEADZONES;
-        }
-
-        return deadzonesStr.split(",").map(Number);
-      }
 
       // prettier-ignore
       const sticksToDisplay = (STICK === "left" || STICK === "right")
@@ -138,24 +130,14 @@
       const drawThrottled = throttle(draw, 16, { trailing: true });
 
       // Global state, shared by drawing functions
-      let isConnected = false;
-
       const STATE = {
+        isConnected: false,
         left: { x: 0, y: 0 },
         right: { x: 0, y: 0 },
       };
 
       // Wire up ✨
       const DIR_TO_AXIS = { left: "x", right: "x", top: "y", bottom: "y" };
-
-      const shouldDrawNewValue = (newValue, oldValue) => {
-        if (DEFLICKER) {
-          const diff = parseFloat(Math.abs(newValue - oldValue).toFixed(2));
-          return diff > 0.01 || newValue === 0;
-        } else {
-          return newValue !== oldValue;
-        }
-      };
 
       // IMPORTANT: Must be set to 0, else no "axis_move" events are
       //            sent when the stick is reset to center (0 value).
@@ -195,73 +177,77 @@
         drawStats();
       }
 
+      function clear() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        $stats.innerHTML = "";
+      }
+
       function drawStick(stick) {
-        // prettier-ignore
-        const offset = sticksToDisplay.length > 1 && stick === "right"
-          ? RADIUS + MARGIN
-          : 0;
+        const yOffset = MARGIN;
+        const xOffset = sticksToDisplay.length > 1 && stick === "right" ? RADIUS + MARGIN * 2 : MARGIN;
+        const radius = sticksToDisplay.length > 1 && stick === "left" ? RADIUS / 2 : RADIUS;
 
-        // prettier-ignore
-        const radius = sticksToDisplay.length > 1 && stick === "left"
-          ? RADIUS / 2
-          : RADIUS;
+        // Background circle stroke
+        circle(radius + xOffset, radius + yOffset, radius + 1, "#555");
 
-        // Background
-        circle(radius + offset, radius, radius, "#222");
+        // Background circle
+        circle(radius + xOffset, radius + yOffset, radius, "#111"); // prev #222
 
-        // Position
-        const x = Number(STATE[stick].x) * radius + radius + offset;
-        const y = Number(STATE[stick].y) * radius + radius;
+        // Dot for current stick value
+        const x = Number(STATE[stick].x) * radius + radius + xOffset;
+        const y = Number(STATE[stick].y) * radius + radius + yOffset;
 
         const dotColor = stick === "right" ? "red" : "#55aaff";
         circle(x, y, RADIUS / 10, dotColor);
 
         // Center point
-        circle(radius + offset, radius, 1, "white");
+        circle(radius + xOffset, radius + yOffset, 1, "white");
       }
 
       function drawStats() {
         // Ensure the disconnected message is cleared on any stats update
-        if (!isConnected) {
-          handleConnect();
-          isConnected = true;
-        }
+        if (!STATE.isConnected) handleConnect();
 
-        // prettier-ignore
-        const html = sticksToDisplay.map((stick) => {
-          const { x: xVal, y: yVal } = STATE[stick];
+        const html = sticksToDisplay
+          .map((stick) => {
+            const { x: xVal, y: yVal } = STATE[stick];
 
-          // NOTE: toFixed() is used again to handle `0` -> `0.00`
-          const x = xVal.toFixed(DECIMAL_PLACES);
-          const y = yVal.toFixed(DECIMAL_PLACES);
+            // NOTE: toFixed() is used again to handle `0` -> `0.00`
+            const x = xVal.toFixed(DECIMAL_PLACES);
+            const y = yVal.toFixed(DECIMAL_PLACES);
 
-          return `
+            return `
             <div class="stick ${stick}">
               <table>
                 <tr>
-                  <td>x:</td>
+                  <td class="vals-label">X</td>
                   <td class="vals ${x === "0.00" ? "zero" : ""}">${x}</td>
                 </tr>
                 <tr>
-                  <td>y:</td>
+                  <td class="vals-label">Y</td>
                   <td class="vals ${y === "0.00" ? "zero" : ""}">${y}</td>
                 </tr>
               </table>
             </div>
-          `;
-        }).join("");
+            `;
+          })
+          .join("");
 
         $stats.innerHTML = html;
       }
 
       function handleDisconnect() {
-        isConnected = false;
-        $status.innerText = "No controller!";
-        $status.style.display = "block";
+        STATE.isConnected = false;
+
+        setTimeout(() => {
+          clear();
+          $status.innerText = "Disconnected";
+          $status.style.display = "block";
+        }, 15);
       }
 
       function handleConnect() {
-        isConnected = true;
+        STATE.isConnected = true;
         $status.style.display = "none";
       }
 
@@ -274,15 +260,46 @@
         ctx.fill();
       }
 
+      // Whether or not to draw the new value, including simplistic de-flickering logic
+      function shouldDrawNewValue(newValue, oldValue) {
+        if (DEFLICKER) {
+          const diff = parseFloat(Math.abs(newValue - oldValue).toFixed(2));
+          return diff > 0.01 || newValue === 0;
+        } else {
+          return newValue !== oldValue;
+        }
+      }
+
       function isOutsideDeadzone(value, stickName) {
         const deadzone = stickName === "left" ? DEADZONES[0] : DEADZONES[1];
 
         return (value > 0 && value > deadzone) || (value < 0 && value < deadzone * -1);
       }
 
-      // prettier-ignore
       function applyDeadZoneAndFormatValue(value, stickName) {
         return isOutsideDeadzone(value, stickName) ? parseFloat(value.toFixed(DECIMAL_PLACES)) : 0;
+      }
+
+      function getDeadzoneParam() {
+        // Legacy param - single "deadzone" value applied to both sticks
+        if (PARAMS.get("deadzone")) {
+          const value = Number(PARAMS.get("deadzone"));
+          return [value, value];
+        }
+
+        // Default param style (comma-separated) e.g. deadzones=0.01,0.05
+        let deadzonesStr;
+
+        if (PARAMS.get("deadzones") && PARAMS.get("deadzones").split(",").length !== 2) {
+          console.error(
+            "Incorrect formatting for 'deadzones' URL parameter. Should be `<left>,<right>` e.g. `deadzones=0.01,0.05`"
+          );
+          deadzonesStr = DEFAULT_DEADZONES;
+        } else {
+          deadzonesStr = PARAMS.get("deadzones") || DEFAULT_DEADZONES;
+        }
+
+        return deadzonesStr.split(",").map(Number);
       }
     </script>
   </body>
