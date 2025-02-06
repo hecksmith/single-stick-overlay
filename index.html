@@ -193,12 +193,37 @@
         // Background circle
         circle(radius + xOffset, radius + yOffset, radius, "#111"); // prev #222
 
+        // Current stick value
+        const { x, y } = STATE[stick];
+
+        // <EXPERIMENT>
+        // Draw point at *edge of circle*, matching angle of current position.
+
+        // Angle for current stick value (rads).
+        const a = Math.atan(y / x);
+
+        // Unit length line at that angle x = cos(a), y = sin(a)
+        let xMax = Math.cos(a);
+        let yMax = Math.sin(a);
+
+        // If x is negative, invert
+        if (x < 0) {
+          xMax *= -1;
+          yMax *= -1;
+        }
+
+        const xMaxPos = xMax * radius + radius + xOffset;
+        const yMaxPos = yMax * radius + radius + yOffset;
+        circle(xMaxPos, yMaxPos, RADIUS / 20, "#fff");
+
+        // </EXPERIMENT>
+
         // Dot for current stick value
-        const x = Number(STATE[stick].x) * radius + radius + xOffset;
-        const y = Number(STATE[stick].y) * radius + radius + yOffset;
+        const xPos = x * radius + radius + xOffset;
+        const yPos = y * radius + radius + yOffset;
 
         const dotColor = stick === "right" ? "red" : "#55aaff";
-        circle(x, y, RADIUS / 10, dotColor);
+        circle(xPos, yPos, RADIUS / 10, dotColor);
 
         // Center point
         circle(radius + xOffset, radius + yOffset, 1, "white");
